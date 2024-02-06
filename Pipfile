@@ -1,0 +1,20 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pyyaml = "*"
+
+[dev-packages]
+pytest = "*"
+pylint = "*"
+coverage = "*"
+tox = "*"
+sphinx = "==6.2.1"
+sphinx-markdown-builder = "==0.6.4"
+sphinxcontrib-napoleon = "==0.7"
+sphinx-rtd-theme = "==0.5.1"
+
+[requires]
+python_version = "3.11"
