@@ -116,10 +116,10 @@ class NHKEasyWebRequests:
         return response
 
     def get_content(self,
-                    data_code:str,  # YYYYMMDD
+                    date_code:str,  # YYYYMMDD
                     id:str,
                     ) -> requests.Response:
-        url = f"https://www3.nhk.or.jp/news/easy/{data_code}/{id}.html"
+        url = f"https://www3.nhk.or.jp/news/easy/{date_code}/{id}.html"
         response = self.crawler.request(method="GET",
                                         url=url,
                                         )
@@ -134,12 +134,38 @@ class NHKEasyWebRequests:
                                         )
         return response
 
-    def get_voice(self,
-                  uri:str,
-                  ) -> requests.Response:
+    def get_voice_m4a(self,
+                      uri:str,
+                      ) -> requests.Response:
         url = f"https://vod-stream.nhk.jp/news/easy_audio/{uri}/index.m3u8"
         response = self.crawler.request(method="GET",
                                         url=url,
-                                        headers=self._headers,
                                         )
+        return response
+
+    def get_voice_mp4(self,
+                      uri:str,
+                      ) -> requests.Response:
+        url = f"https://vod-stream.nhk.jp/news/easy/{uri}/index.m3u8"
+        response = self.crawler.request(method="GET",
+                                        url=url,
+                                        )
+        return response
+
+    def get_voice(self,
+                  uri:str,
+                  fmt:str=None,
+                  ) -> requests.Response:
+        if fmt not in [None, "m4a", "mp4"]:
+            raise ValueError("Unknown audio type")
+        formats = ["m4a", "mp4"] if fmt is None else [fmt]
+
+        for format in formats:
+            if format == "mp4":
+                response = self.get_voice_mp4(uri)
+            elif format == "m4a":
+                response = self.get_voice_m4a(uri)
+
+            if response.status_code == 200:
+                return response
         return response
