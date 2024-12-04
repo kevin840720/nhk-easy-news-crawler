@@ -168,19 +168,33 @@ class MyRequests:
                 raise TimeoutError('No response, check your internet.')
         return response
 
-class HLSMediaCrawler:
+class HLSMediaDownloader:
     def __init__(self) -> None:
+        """本程式主要用於下載和合併使用 HTTP Live Streaming (HLS) 協議的多媒體資料。
+        
+        Note:
+            HLS 將視頻內容 分割成數個較小的段落，每個段落都通過 HTTP 協議以 TS (運輸流格式) 文件形式傳輸，利用 M3U8 播放列表來管理這些
+            TS 文件的索引。本類別的目的是從指定的 M3U8 播放列表 URL 中抓取所有 TS 文件連結，下載這些文件，並最終合併成一個單一的多媒體文件。
+        """
         self._requestor = MyRequests()
 
     def fetch_playlist(self,
                        m3u8_url:str,
                        ) -> List[m3u8.M3U8]:
-        """Fetch the playlist file from m3u8 and extract TS file URLs.
+        """Fetch and flatten all M3U8 playlists, including nested playlists, from the given M3U8 URL.
 
-        由於 M3U8 檔案中可能包含另一個 M3U8，所以要先將所有的 M3U8 攤平，只留下「包含 TS 檔的M3U8」
+        This function recursively resolves variant M3U8 playlists to extract and return a list
+        of all non-variant playlists that directly reference TS files.
+
+        Args:
+            m3u8_url (str): URL of the M3U8 playlist, for example https://example.com/master.m3u8
 
         Returns:
-            List[TS]: A list of TS objects representing the media segments found in the playlist.
+            List[m3u8.M3U8]: Playlists containing only TS segments
+
+        Notes:
+            - If the provided M3U8 is a variant playlist, it will recursively resolve all sub-playlists
+              until only non-variant playlists remain.
         """
 
         def get_m3u8s(obj:m3u8.M3U8):
@@ -222,19 +236,26 @@ class HLSMediaCrawler:
         for segment in playlist.segments:
             # Download and process each TS segment
             ts_url = urljoin(segment.base_uri, segment.uri)
-            print(ts_url)
             response = self._requestor.request("GET", ts_url)
             segment_content = response.content
 
             # Decrypt the segment if an AES key is provided
             if aes_key:
                 segment_content = self.decrypt_segment(segment_content, aes_key)
-                print("AAA")
 
             combined_segments += segment_content
         return combined_segments
 
     def decrypt_segment(self, segment, key):
+        """Decrypt a single TS segment using AES CBC mode.
+
+        Args:
+            segment (bytes): Encrypted segment content
+            key (bytes): Decryption key
+
+        Returns:
+            bytes: Decrypted segment content
+        """
         cipher = AES.new(key, AES.MODE_CBC, iv=b'\x00'*16)  # 初始化向量通常為零
         return cipher.decrypt(segment)
 
@@ -242,7 +263,16 @@ class HLSMediaCrawler:
              m3u8_url:str,
              filename:Union[str,Path],
              ) -> None:
-        """Run the media crawler to fetch, download, and merge TS files.
+        """Download and save media from an M3U8 playlist.
+
+        Fetches playlist, downloads segments, and saves to file.
+
+        Args:
+            m3u8_url (str): URL of the M3U8 playlist
+            filename (Union[str, Path]): Output file path
+
+        Raises:
+            ValueError: If no playlists are found
         """
         playlists = self.fetch_playlist(m3u8_url)
         if len(playlists) == 0:
@@ -419,7 +449,6 @@ class NHKEasyNewsClient:
             if response.status_code == 200:
                 return response
         return response
-
 
 class NHKNewsType(Enum):
     social = 1

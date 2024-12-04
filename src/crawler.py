@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 
 from config import ProjectConfigs
 from objects import Content, News, Voice
-from utils import NHKEasyNewsClient, HLSMediaCrawler
+from utils import NHKEasyNewsClient, HLSMediaDownloader
 
 class NHKEasyWebCrawler:
     def __init__(self):
@@ -56,7 +56,7 @@ class NHKEasyWebCrawler:
         # if response.status_code == 200:
         #     with open(path, 'wb') as file:
         #         file.write(response.content)
-        HLSMediaCrawler().save(response.url, path)
+        HLSMediaDownloader().save(response.url, path)
         return Voice(response.status_code,
                      voice_id,
                      response.url,
