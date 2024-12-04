@@ -15,25 +15,40 @@ from bs4 import BeautifulSoup
 
 from config import ProjectConfigs
 from objects import Content, News, Voice
-from utils import NHKEasyWebRequests
+from utils import NHKEasyNewsClient
 
 class NHKEasyWebCrawler:
     def __init__(self):
-        self.crawler = NHKEasyWebRequests()
+        """A web crawler for NHK Easy News, designed to download news content and associated audio.
+
+        This class provides methods to retrieve recent news articles from NHK Easy Web, 
+        downloading both the HTML content and voice recordings for each news item within 
+        a specified date range.
+
+        Example:
+            crawler = NHKEasyWebCrawler()
+            # Get news from the last 30 days
+            recent_news = crawler.get_recent_news(
+                start_date=datetime.now() - timedelta(days=30)
+            )
+        """
+        self.crawler = NHKEasyNewsClient()
         self._news = []
 
     def download_voice(self,
                        voice_id:str,
                        voice_dir=ProjectConfigs.RAW_DIR.joinpath("nhk_easy_web/voices"),
                        ) -> Voice:
-        """This function is going to handle the response object.
+        """Download an audio voice recording for a specific news item.
 
         Args:
-            voice_id (str): _description_
-            voice_dir (_type_, optional): _description_. Defaults to ProjectConfigs.RAW_DIR.joinpath("nhk_easy_web/voices").
+            voice_id (str): Unique identifier for the voice recording.
+            voice_dir (Path, optional): Directory to save the voice file. 
+                Defaults to a predefined path in project configurations.
 
         Returns:
-            Path: _description_
+            Voice: An object representing the downloaded voice recording, 
+                   containing metadata and file path.
         """
         response = self.crawler.get_voice(voice_id)
         path = voice_dir.joinpath(f'{voice_id}.m3u8')
@@ -52,6 +67,17 @@ class NHKEasyWebCrawler:
                          content_id:str,
                          content_dir=ProjectConfigs.RAW_DIR.joinpath("nhk_easy_web/contents"),
                          ) -> Content:
+        """Download the HTML content for a specific news article.
+
+        Args:
+            content_id (str): Unique identifier for the news article.
+            content_dir (Path, optional): Directory to save the HTML content. 
+                Defaults to a predefined path in project configurations.
+
+        Returns:
+            Content: An object representing the downloaded content, 
+                     containing metadata and file path.
+        """
         response = self.crawler.get_easy_content(content_id)
         path = content_dir.joinpath(f'{content_id}.html')
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -71,6 +97,25 @@ class NHKEasyWebCrawler:
                         start_date:datetime=None,
                         end_date:datetime=None,
                         ):
+        """Retrieve recent news articles within a specified date range.
+
+        This method fetches news articles from NHK Easy Web, downloading both 
+        content and voice recordings for each article. By default, it retrieves 
+        news from the past year.
+
+        Args:
+            start_date (datetime, optional): The earliest date to retrieve news from. 
+                Defaults to one year ago from the current date.
+            end_date (datetime, optional): The latest date to retrieve news to. 
+                Defaults to the current date.
+
+        Returns:
+            List[News]: A list of News objects containing article details, 
+                        content, and voice recordings.
+
+        Raises:
+            ValueError: If the start date is more than one year in the past.
+        """
         start_date = start_date if start_date else (datetime.now() - timedelta(days=365)).date()
         end_date = end_date if end_date else datetime.now().date()
         if start_date < (datetime.now() - timedelta(days=365)).date():
