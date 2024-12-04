@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 pyyaml = "*"
+bs4 = "*"
+requests = "*"
 
 [dev-packages]
 pytest = "*"
