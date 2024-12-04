@@ -15,5 +15,5 @@
 from pathlib import Path
 import sys
 
-scripts_path = Path(__file__).parent.joinpath('scripts')
+scripts_path = Path(__file__).parent.joinpath('src')
 sys.path.append(scripts_path.__str__())

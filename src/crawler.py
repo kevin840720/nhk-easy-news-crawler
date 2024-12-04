@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 
 from config import ProjectConfigs
 from objects import Content, News, Voice
-from utils import NHKEasyNewsClient
+from utils import NHKEasyNewsClient, HLSMediaCrawler
 
 class NHKEasyWebCrawler:
     def __init__(self):
@@ -50,11 +50,13 @@ class NHKEasyWebCrawler:
             Voice: An object representing the downloaded voice recording, 
                    containing metadata and file path.
         """
-        response = self.crawler.get_voice(voice_id)
-        path = voice_dir.joinpath(f'{voice_id}.m3u8')
-        if response.status_code == 200:
-            with open(path, 'wb') as file:
-                file.write(response.content)
+        response = self.crawler.get_voice_m3u8(voice_id)
+        path = voice_dir.joinpath(f'{voice_id}.mp3')
+        # path = voice_dir.joinpath(f'{voice_id}.m3u8')
+        # if response.status_code == 200:
+        #     with open(path, 'wb') as file:
+        #         file.write(response.content)
+        HLSMediaCrawler().save(response.url, path)
         return Voice(response.status_code,
                      voice_id,
                      response.url,
@@ -78,7 +80,7 @@ class NHKEasyWebCrawler:
             Content: An object representing the downloaded content, 
                      containing metadata and file path.
         """
-        response = self.crawler.get_easy_content(content_id)
+        response = self.crawler.get_content(content_id)
         path = content_dir.joinpath(f'{content_id}.html')
         soup = BeautifulSoup(response.text, 'html.parser')
         if response.status_code == 200:
@@ -122,7 +124,7 @@ class NHKEasyWebCrawler:
             raise ValueError("Start date cannot be more than one year ago.")
         
         def iterate_news_list(start_date, end_date) -> dict:
-            news_list = json.loads(self.crawler.get_news_list().text)[0]
+            news_list = self.crawler.get_news_summary()
             for _date in news_list:
                 date = datetime.strptime(_date, "%Y-%m-%d").date()
                 if date < start_date or date > end_date:
