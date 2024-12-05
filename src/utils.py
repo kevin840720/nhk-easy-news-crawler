@@ -11,39 +11,16 @@ from pathlib import Path
 from time import (sleep,
                   time,
                   )
-from typing import (Literal,
-                    List,
-                    Optional,
-                    )
-import json
-
-from Crypto.Cipher import AES
-import requests
-
-# -*- encoding: utf-8 -*-
-"""
-@File    :  main.py
-@Time    :  2024/05/02 15:51:37
-@Author  :  Kevin Wang
-@Desc    :  本程式主要用於下載和合併使用 HTTP Live Streaming (HLS) 協議的多媒體資料。HLS 將視頻內容 分割成數個較小的段落，每個段落都
-            通過 HTTP 協議以 TS (運輸流格式) 文件形式傳輸，利用 M3U8 播放列表來管理這些 TS 文件的索引。本類別的目的是從指定的 M3U8 播放
-            列表 URL 中抓取所有 TS 文件連結，下載這些文件，並最終合併成一個單一的多媒體文件。
-
-            爬蟲流程：
-            1. 解析 M3U8 播放列表以獲得 TS 文件的 URL。
-            2. 下載所有 TS 文件。
-            3. 將下載的 TS 文件合併成一個完整的視頻文件。
-"""
-
-from pathlib import Path
 from typing import (List,
                     Union,
                     )
 from urllib.parse import urljoin
-import re
+import json
 
-
+from Crypto.Cipher import AES
 import m3u8
+import requests
+
 
 class MyRequests:
     def __init__(self) -> None:
@@ -208,7 +185,6 @@ class HLSMediaDownloader:
 
         playlist = m3u8.load(m3u8_url)
         playlists = get_m3u8s(playlist)
-        print(playlists[0].__dict__)
         return playlists
 
     def download_m3u8(self,
@@ -382,53 +358,14 @@ class NHKEasyNewsClient:
                                         )
         return response
 
-    def get_voice_m3u8_m4a_type(self,
-                                uri:str,
-                                ) -> requests.Response:
-        """
-        Retrieve the M4A voice recording for a news article.
-
-        Args:
-            uri (str): Unique identifier for the voice recording.
-
-        Returns:
-            requests.Response: A response containing the M4A voice recording's M3U8 playlist.
-        """
-        url = f"https://vod-stream.nhk.jp/news/easy_audio/{uri}/index.m3u8"
-        response = self.crawler.request(method="GET",
-                                        url=url,
-                                        )
-        return response
-
-    def get_voice_m3u8_mp4_type(self,
-                                uri:str,
-                                ) -> requests.Response:
-        """
-        Retrieve the MP4 voice recording for a news article.
-
-        Args:
-            uri (str): Unique identifier for the voice recording.
-
-        Returns:
-            requests.Response: A response containing the MP4 voice recording's M3U8 playlist.
-        """
-        url = f"https://vod-stream.nhk.jp/news/easy/{uri}/index.m3u8"
-        response = self.crawler.request(method="GET",
-                                        url=url,
-                                        )
-        return response
-
     def get_voice_m3u8(self,
                        uri:str,
-                       fmt:Literal["m4a", "mp4"]=None,
                        ) -> requests.Response:
         """
-        Retrieve a voice recording, attempting both M4A and MP4 formats.
+        Retrieve a voice recording.
 
         Args:
             uri (str): Unique identifier for the voice recording.
-            fmt (str, optional): Specific audio format to retrieve. 
-                                 Can be 'm4a', 'mp4', or None (tries both).
 
         Returns:
             requests.Response: A response containing the voice recording's M3U8 playlist.
@@ -436,16 +373,14 @@ class NHKEasyNewsClient:
         Raises:
             ValueError: If an invalid audio format is specified.
         """
-        if fmt not in [None, "m4a", "mp4"]:
-            raise ValueError("Unknown audio type")
-        formats = ["m4a", "mp4"] if fmt is None else [fmt]
+        candidate_urls = [f"https://vod-stream.nhk.jp/news/easy_audio/{uri}/index.m3u8",  # m4a type
+                          f"https://vod-stream.nhk.jp/news/easy/{uri}/index.m3u8",  # mp4 type
+                          ]
 
-        for format in formats:
-            if format == "mp4":
-                response = self.get_voice_m3u8_mp4_type(uri)
-            elif format == "m4a":
-                response = self.get_voice_m3u8_m4a_type(uri)
-
+        for url in candidate_urls:
+            response = self.crawler.request(method="GET",
+                                            url=url,
+                                            )
             if response.status_code == 200:
                 return response
         return response

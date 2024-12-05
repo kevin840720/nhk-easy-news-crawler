@@ -7,31 +7,35 @@
 """
 
 from datetime import datetime, timedelta
-from typing import Dict
-from pathlib import Path
 import json
 
 from bs4 import BeautifulSoup
 
 from config import ProjectConfigs
-from objects import Content, News, Voice
-from utils import NHKEasyNewsClient, HLSMediaDownloader
+from objects import (Content,
+                     News,
+                     Voice,
+                     )
+from parser import NHKEasyNewsWebParser
+from utils import (HLSMediaDownloader,
+                   NHKEasyNewsClient,
+                   )
 
 class NHKEasyWebCrawler:
+    """A web crawler for NHK Easy News, designed to download news content and associated audio.
+
+    This class provides methods to retrieve recent news articles from NHK Easy Web, 
+    downloading both the HTML content and voice recordings for each news item within 
+    a specified date range.
+
+    Example:
+        crawler = NHKEasyWebCrawler()
+        # Get news from the last 30 days
+        recent_news = crawler.download_recent_news(
+            start_date=datetime.now() - timedelta(days=30)
+        )
+    """
     def __init__(self):
-        """A web crawler for NHK Easy News, designed to download news content and associated audio.
-
-        This class provides methods to retrieve recent news articles from NHK Easy Web, 
-        downloading both the HTML content and voice recordings for each news item within 
-        a specified date range.
-
-        Example:
-            crawler = NHKEasyWebCrawler()
-            # Get news from the last 30 days
-            recent_news = crawler.get_recent_news(
-                start_date=datetime.now() - timedelta(days=30)
-            )
-        """
         self.crawler = NHKEasyNewsClient()
         self._news = []
 
@@ -52,10 +56,6 @@ class NHKEasyWebCrawler:
         """
         response = self.crawler.get_voice_m3u8(voice_id)
         path = voice_dir.joinpath(f'{voice_id}.mp3')
-        # path = voice_dir.joinpath(f'{voice_id}.m3u8')
-        # if response.status_code == 200:
-        #     with open(path, 'wb') as file:
-        #         file.write(response.content)
         HLSMediaDownloader().save(response.url, path)
         return Voice(response.status_code,
                      voice_id,
@@ -82,23 +82,32 @@ class NHKEasyWebCrawler:
         """
         response = self.crawler.get_content(content_id)
         path = content_dir.joinpath(f'{content_id}.html')
-        soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(response.content, 'html.parser')
+        parser = NHKEasyNewsWebParser(soup)
+
         if response.status_code == 200:
             with open(path, 'wb') as file:
                 file.write(response.content)
-        return Content(response.status_code,
-                       content_id,
-                       response.url,
-                       None,
-                       datetime.now(),
-                       path,
-                       # soup,
+        try:
+            publication_time = datetime.strptime(parser.date, "%Y年%m月%d日 %H時%M分")
+        except ValueError:
+            publication_time = None
+        return Content(status=response.status_code,
+                       id=content_id,
+                       url=response.url,
+                       title=parser.title,
+                       article=parser.body,
+                       publication_time=publication_time,
+                       download_time=datetime.now(),
+                       location=path,
+                       html=response.text,
                        )
 
-    def get_recent_news(self,
-                        start_date:datetime=None,
-                        end_date:datetime=None,
-                        ):
+    def download_recent_news(self,
+                             start_date:datetime=None,
+                             end_date:datetime=None,
+                             save_dir=ProjectConfigs.RAW_DIR.joinpath("nhk_easy_web"),
+                             ):
         """Retrieve recent news articles within a specified date range.
 
         This method fetches news articles from NHK Easy Web, downloading both 
@@ -122,17 +131,17 @@ class NHKEasyWebCrawler:
         end_date = end_date if end_date else datetime.now().date()
         if start_date < (datetime.now() - timedelta(days=365)).date():
             raise ValueError("Start date cannot be more than one year ago.")
-        
+
         def iterate_news_list(start_date, end_date) -> dict:
             news_list = self.crawler.get_news_summary()
             for _date in news_list:
                 date = datetime.strptime(_date, "%Y-%m-%d").date()
                 if date < start_date or date > end_date:
                     continue
-                for news_info in news_list[_date]:
-                    yield news_info
-        
-        news = []
+                yield from news_list[_date]
+
+        news_list = []
+        news_json = []
         for news_info in iterate_news_list(start_date, end_date):
             publication_time = (news_info["news_publication_time"]
                                 or news_info["news_preview_time"]
@@ -141,25 +150,35 @@ class NHKEasyWebCrawler:
                                 )
             publication_time = datetime.strptime(publication_time, "%Y-%m-%d %H:%M:%S")
             voice_id = news_info["news_easy_voice_uri"].split(".")[0]
-            content = self.download_content(news_info["news_id"])
-            voice = self.download_voice(voice_id)
 
+            # Download Article content and voice file
+            content:Content = self.download_content(news_info["news_id"],
+                                                    save_dir.joinpath("contents"),
+                                                    )
+            voice:Voice = self.download_voice(voice_id,
+                                              save_dir.joinpath("voices"),
+                                              )
 
-            news.append(News("NHK Easy Web",
-                             news_info["news_id"],
-                             news_info["title"],
-                             content.url,
-                             publication_time,
-                             datetime.now(),
-                             None,
-                             voice,
-                             content,
-                             )
+            news = News("NHK Easy Web",
+                        news_info["news_id"],
+                        news_info["title"],
+                        content.url,
+                        publication_time,
+                        datetime.now(),
+                        None,
+                        voice,
+                        content,
                         )
-        self._news += news
-        return news
-    
+            news_list.append(news)
+            news_json.append(news.to_json_dict())
+
+        # Save news object 
+        with open(save_dir.joinpath("news.json"), "w", encoding="utf-8") as file:
+            json.dump(news_json, file, ensure_ascii=False, indent=4)
+        self._news += news_list
+        return news_list
+
 if __name__ == "__main__":
-    a = NHKEasyWebCrawler().get_recent_news()
+    a = NHKEasyWebCrawler().download_recent_news()
     # a = NHKEasyWebCrawler().download_voice("k10014346261000_6mHAVGzMvPy7augGieIgIWnP8lt6zVMdzJEAxJdk")
     # print(a)

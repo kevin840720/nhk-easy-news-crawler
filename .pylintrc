@@ -2,4 +2,4 @@
 max-line-length=120
 
 [MESSAGES CONTROL]
-disable=R0903, W1203
+disable=R0903, W1203, E0401
