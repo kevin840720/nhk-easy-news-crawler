@@ -19,13 +19,14 @@ from objects import (Content,
 from parser import NHKEasyNewsWebParser
 from utils import (HLSMediaDownloader,
                    NHKEasyNewsClient,
+                   NHKNewsClient,
                    )
 
 class NHKEasyWebCrawler:
     """A web crawler for NHK Easy News, designed to download news content and associated audio.
 
     This class provides methods to retrieve recent news articles from NHK Easy Web, 
-    downloading both the HTML content and voice recordings for each news item within 
+    downloading both the articles and voice recordings for each news item within 
     a specified date range.
 
     Example:
@@ -56,6 +57,8 @@ class NHKEasyWebCrawler:
         """
         response = self.crawler.get_voice_m3u8(voice_id)
         path = voice_dir.joinpath(f'{voice_id}.mp3')
+
+        voice_dir.mkdir(exist_ok=True, parents=True)
         HLSMediaDownloader().save(response.url, path)
         return Voice(response.status_code,
                      voice_id,
@@ -65,10 +68,10 @@ class NHKEasyWebCrawler:
                      path,
                      )
 
-    def download_content(self,
-                         content_id:str,
-                         content_dir=ProjectConfigs.RAW_DIR.joinpath("nhk_easy_web/contents"),
-                         ) -> Content:
+    def download_html(self,
+                      content_id:str,
+                      content_dir=ProjectConfigs.RAW_DIR.joinpath("nhk_easy_web/contents"),
+                      ) -> Content:
         """Download the HTML content for a specific news article.
 
         Args:
@@ -85,6 +88,7 @@ class NHKEasyWebCrawler:
         soup = BeautifulSoup(response.content, 'html.parser')
         parser = NHKEasyNewsWebParser(soup)
 
+        content_dir.mkdir(exist_ok=True, parents=True)
         if response.status_code == 200:
             with open(path, 'wb') as file:
                 file.write(response.content)
@@ -152,7 +156,7 @@ class NHKEasyWebCrawler:
             voice_id = news_info["news_easy_voice_uri"].split(".")[0]
 
             # Download Article content and voice file
-            content:Content = self.download_content(news_info["news_id"],
+            content:Content = self.download_html(news_info["news_id"],
                                                     save_dir.joinpath("contents"),
                                                     )
             voice:Voice = self.download_voice(voice_id,
