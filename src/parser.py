@@ -64,9 +64,12 @@ class NHKNewsWebParser:
         meta_data = self._get_article_meta()
         if meta_data:
             return meta_data["headline"]
+
         # 如果抓不到 meta data ，則直接從文章中爬取
         title_block = self.soup.find("h1", {"class": "content--title"})
-        return title_block.text
+        if title_block:
+            return title_block.text
+        return None
 
     @property
     def genre(self):
@@ -99,14 +102,20 @@ class NHKNewsWebParser:
     @property
     def date(self):
         date_block = self.soup.find("p", {"class": "content--date"})
-        return date_block.find("time").text
+        if date_block:
+            return date_block.find("time").text
+        return None
 
     @property
     def summary(self):
-        body_block = self.soup.find("p", {"class": "content--summary"})
-        return body_block.text
+        block = self.soup.find("p", {"class": "content--summary"})
+        if block:
+            return block.text
+        return None
 
     @property
     def body(self):
-        body_block = self.soup.find("div", {"class": "content--detail-more"})
-        return body_block.text
+        block = self.soup.find("div", {"class": "content--detail-more"})
+        if block:
+            return block.text
+        return None

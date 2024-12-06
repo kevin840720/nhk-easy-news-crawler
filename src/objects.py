@@ -13,17 +13,16 @@
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any
-import json
+from typing import Optional
 
 @dataclass
-class Voice:
+class Media:
     status:str
-    id:str=None
-    url:str=None
-    publication_time:datetime=None
-    download_time:datetime=None
-    location:Path=None
+    id:str
+    url:str
+    filepath:Path=None
+    publication_time:Optional[datetime]=None
+    download_time:Optional[datetime]=None
 
     def to_json_dict(self):
         data = {}
@@ -34,22 +33,21 @@ class Voice:
             data['publication_time'] = data['publication_time'].isoformat()
         if data['download_time'] is not None:
             data['download_time'] = data['download_time'].isoformat()
-        if data['location'] is not None:
-            data['location'] = self.location.__str__()
-
+        if data['filepath'] is not None:
+            data['filepath'] = self.filepath.__str__()
         return data
 
 @dataclass
-class Content:
+class HTMLContent:
     status:str
-    id:str=None
-    url:str=None
-    title:str=None
-    article:str=None
-    publication_time:datetime=None
-    download_time:datetime=None
-    location:Path=None
-    html:str=None
+    id:str
+    url:str
+    filepath:Path
+    title:Optional[str]=None
+    article:Optional[str]=None
+    publication_time:Optional[datetime]=None
+    download_time:Optional[datetime]=None
+    html:Optional[str]=None
 
     def to_json_dict(self):
         data = {}
@@ -60,8 +58,8 @@ class Content:
             data['publication_time'] = data['publication_time'].isoformat()
         if data['download_time'] is not None:
             data['download_time'] = data['download_time'].isoformat()
-        if data['location'] is not None:
-            data['location'] = self.location.__str__()
+        if data['filepath'] is not None:
+            data['filepath'] = self.filepath.__str__()
         data.pop("html")  # 不要儲存原始 html
 
         return data
@@ -72,17 +70,18 @@ class News:
     source_id:str
     title:str
     url:str
-    publication_time:datetime=None
-    download_time:datetime=None
-    author:str=None
-    voice:Voice=None
-    content:Content=None
+    publication_time:Optional[datetime]=None
+    download_time:Optional[datetime]=None
+    author:Optional[str]=None
+    media:Optional[Media]=None
+    html_content:Optional[HTMLContent]=None
 
     @property
-    def id(self):
-        hash((self.source, self.source_id))
+    def id(self) -> int:
+        # In binary, 0x7FFFFFFF becomes 01111111 11111111 11111111 11111111
+        return hash((self.source, self.source_id)) & 0x7FFFFFFF
     
-    def to_json_dict(self):
+    def to_json_dict(self) -> dict:
         data = {}
         data['id'] = self.id
         data = {**data, **asdict(self)}
@@ -91,9 +90,9 @@ class News:
             data['publication_time'] = data['publication_time'].isoformat()
         if data['download_time'] is not None:
             data['download_time'] = data['download_time'].isoformat()
-        if data['voice'] is not None:
-            data['voice'] = self.voice.to_json_dict()
-        if data['content'] is not None:
-            data['content'] = self.content.to_json_dict()
+        if data['media'] is not None:
+            data['media'] = self.media.to_json_dict()
+        if data['html_content'] is not None:
+            data['html_content'] = self.html_content.to_json_dict()
 
         return data

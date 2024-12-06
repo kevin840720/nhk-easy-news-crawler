@@ -199,40 +199,64 @@ class HLSMediaDownloader:
         Returns:
             bytes: The combined binary content of all TS segments.
         """
-        # Retrieve AES key if encryption is used
+        combined_segments = b""
+
+        # If encrypted, get the key
         aes_key = None
+        iv_explicit = None
+
+        # According to HLS spec, all segments following the #EXT-X-KEY use the specified key and IV (if provided).
+        # If IV is not specified, we must derive it from the segment sequence number.
         if len(playlist.keys) > 0:
             key:m3u8.Key = playlist.keys[0]
             key_url = urljoin(key.base_uri, key.uri)
             key_response = self._requestor.request("GET", key_url)
             aes_key = key_response.content
-        
 
-        combined_segments = b""
-        for segment in playlist.segments:
-            # Download and process each TS segment
+            # If IV is explicitly given, parse it as a hex string.
+            if key.iv:
+                # IVs in M3U8 are specified as a hexadecimal string starting with 0x
+                iv_explicit = bytes.fromhex(key.iv[2:]) if key.iv.startswith("0x") else bytes.fromhex(key.iv)
+
+        # Determine the starting sequence number
+        # `#EXT-X-MEDIA-SEQUENCE` sets the sequence number of the first segment.
+        # If not present, default to 0.
+        sequence_number = playlist.media_sequence or 0
+        for idx, segment in enumerate(playlist.segments):
             ts_url = urljoin(segment.base_uri, segment.uri)
             response = self._requestor.request("GET", ts_url)
             segment_content = response.content
 
-            # Decrypt the segment if an AES key is provided
             if aes_key:
-                segment_content = self.decrypt_segment(segment_content, aes_key)
+                # Derive IV if not explicitly set
+                if iv_explicit is not None:
+                    iv = iv_explicit
+                else:
+                    # Construct IV from sequence number
+                    # Big-endian 64-bit (or 128-bit) integer: per the HLS spec,
+                    # IV is a 128-bit number; we can represent sequence_number as a 64-bit integer and pad to 128 bits.
+                    # Common practice: pack the sequence number into the last 8 bytes of a 16-byte array.
+                    iv_int = sequence_number + idx
+                    iv = iv_int.to_bytes(16, byteorder='big')
+
+                segment_content = self.decrypt_segment(segment_content, aes_key, iv=iv)
 
             combined_segments += segment_content
         return combined_segments
 
-    def decrypt_segment(self, segment, key):
+    def decrypt_segment(self, segment, key, mode=AES.MODE_CBC, iv=b'\x00'*16):
         """Decrypt a single TS segment using AES CBC mode.
 
         Args:
             segment (bytes): Encrypted segment content
             key (bytes): Decryption key
+            mode (_type_, optional): _description_. Defaults to AES.MODE_CBC.
+            iv (_type_, optional): _description_. Defaults to b'\x00'*16.
 
         Returns:
             bytes: Decrypted segment content
         """
-        cipher = AES.new(key, AES.MODE_CBC, iv=b'\x00'*16)  # 初始化向量通常為零
+        cipher = AES.new(key, mode=mode, iv=iv)
         return cipher.decrypt(segment)
 
     def save(self,
@@ -444,9 +468,8 @@ class NHKNewsClient:
         return self.crawler._last_response
 
     def get_news_summary(self,
-                      news_type:NHKNewsType,
-                      sheet:int=1,
-                      ) -> List[requests.Response]:
+                         news_type:NHKNewsType,
+                         ) -> dict:
         """
         Retrieve the list of news articles from the past year.
 
@@ -455,15 +478,28 @@ class NHKNewsClient:
         Returns:
             requests.Response: A response containing the news list in JSON format.
         """
-        url = f"https://www3.nhk.or.jp/news/json16/cat{news_type.value:02d}_{sheet:03d}.json"
+        data = {}
+        for sheet in range(1, 1000):
+            url = f"https://www3.nhk.or.jp/news/json16/cat{news_type.value:02d}_{sheet:03d}.json"
+            params = {"_": int(time()),  # Unix time (這像參數貌似不影響回傳結果)
+                      }
+            response = self.crawler.request(method="GET",
+                                            url=url,
+                                            params=params,
+                                            )
 
-        params = {"_": int(time()),  # Unix time (這像參數貌似不影響回傳結果)
-                    }
-        response = self.crawler.request(method="GET",
-                                        url=url,
-                                        params=params,
-                                        )
-        return response
+            current_data = json.loads(response.text)
+            if not data:
+                data = current_data
+            elif (("channel" in current_data)
+                  and ("item" in current_data["channel"])
+                  ):
+                data["channel"]["item"] += current_data["channel"]["item"]
+
+            # hasNext 會標注是否有「下一頁」
+            if current_data["channel"]["hasNext"] is False:
+                break
+        return data
 
     def get_content(self,
                     date:str,
@@ -485,9 +521,9 @@ class NHKNewsClient:
                                         )
         return response
 
-    def get_video_mp4(self,
-                      uri:str,
-                      ) -> requests.Response:
+    def get_video_m3u8(self,
+                       uri:str,
+                       ) -> requests.Response:
         """
         Retrieve the MP4 voice recording for a news article.
 

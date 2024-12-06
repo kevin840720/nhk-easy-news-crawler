@@ -74,10 +74,10 @@ class TestNHKNewsWebParser:
         assert text == "【ライブ中】JAXA「イプシロンS」先月の爆発事故調査状況説明"
 
     def test_genre(self):
-        assert self.parser.genre == ["社会","科学・文化"]
+        assert self.parser.genre == ["社会", "科学・文化"]
 
     def test_keywords(self):
-        assert self.parser.keywords == ["宇宙","鹿児島県","ニュース深掘り"]
+        assert self.parser.keywords == ["宇宙", "鹿児島県", "ニュース深掘り"]
 
     def test_published_date(self):
         text = re.sub(r"\s", "", self.parser.published_date)
