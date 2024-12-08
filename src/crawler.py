@@ -65,6 +65,7 @@ class NHKEasyWebCrawler:
         HLSMediaDownloader().save(response.url, path)
         return Media(status=response.status_code,
                      id=voice_id,
+                     type="Audio",
                      url=response.url,
                      filepath=path,
                      publication_time=None,
@@ -225,6 +226,7 @@ class NHKWebCrawler:
         HLSMediaDownloader().save(response.url, path)
         return Media(status=response.status_code,
                      id=video_id,
+                     type="Video",
                      url=response.url,
                      filepath=path,
                      publication_time=None,
@@ -362,7 +364,7 @@ class NHKWebCrawler:
         return news_list
 
 if __name__ == "__main__":
-    # NHKEasyWebCrawler().download_recent_news()
+    NHKEasyWebCrawler().download_recent_news()
     NHKWebCrawler().download_recent_news()
     # from utils import NHKNewsType, NHKNewsClient
     # a = NHKNewsClient().get_news_summary(NHKNewsType.culture)

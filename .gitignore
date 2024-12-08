@@ -89,3 +89,6 @@ target/
 .Pipfile
 .mypy_cache/
 .dev/*
+data/*
+database/docker-compose.yaml
+database/data/*

@@ -13,12 +13,13 @@
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Literal
 
 @dataclass
 class Media:
     status:str
     id:str
+    type:Literal["Audio", "Video"]
     url:str
     filepath:Path=None
     publication_time:Optional[datetime]=None

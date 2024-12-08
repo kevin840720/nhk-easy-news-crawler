@@ -9,6 +9,9 @@ bs4 = "*"
 requests = "*"
 m3u8 = "*"
 pycryptodome = "*"
+psycopg-binary = "*"
+psycopg2-binary = "*"
+python-dotenv = "*"
 
 [dev-packages]
 pytest = "*"
