@@ -11,8 +11,8 @@ from export import Export2PostgreSQL
 
 if __name__ == "__main__":
     from datetime import datetime
-    news_list = (NHKEasyWebCrawler().download_recent_news(start_date=datetime(2024, 12, 7))
-                 + NHKWebCrawler().download_recent_news(start_date=datetime(2024, 12, 7))
+    news_list = (NHKEasyWebCrawler().download_recent_news()
+                 + NHKWebCrawler().download_recent_news()
                  )
     export_class = Export2PostgreSQL()
     for news in news_list:

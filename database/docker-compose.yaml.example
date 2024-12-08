@@ -1,7 +1,7 @@
 version: '3'
 services:
   japanese-article-postgresql:
-    image: postgres:latest
+    image: pgvector/pgvector:pg17  # postgresql 17 + pgvector
     container_name: ${CONTAINER_NAME}
     restart: always
     env_file:
