@@ -1,0 +1,21 @@
+version: '3'
+services:
+  japanese-article-postgresql:
+    image: pgvector/pgvector:pg17  # postgresql 17 + pgvector
+    container_name: ${CONTAINER_NAME}
+    restart: always
+    env_file:
+      - {{Project absolute path}}/.env
+    environment:
+      POSTGRES_DB: ${PG_DBNAME}
+      POSTGRES_USER: ${PG_USERNAME}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    volumes:
+      - {{Project absolute path}}/database/data:/var/lib/postgresql/data
+    ports:
+      - "${PG_PORT}:5432"
+    user: 1000:1000
+
+volumes:
+  db:
+    driver: local

@@ -9,16 +9,13 @@ bs4 = "*"
 requests = "*"
 m3u8 = "*"
 pycryptodome = "*"
+psycopg-binary = "*"
+psycopg2-binary = "*"
+python-dotenv = "*"
 
 [dev-packages]
 pytest = "*"
 pylint = "*"
-coverage = "*"
-tox = "*"
-sphinx = "==6.2.1"
-sphinx-markdown-builder = "==0.6.4"
-sphinxcontrib-napoleon = "==0.7"
-sphinx-rtd-theme = "==0.5.1"
 
 [requires]
 python_version = "3.11"

@@ -9,7 +9,10 @@ import datetime
 
 import pytest
 
-from src.utils import NHKEasyNewsClient
+from src.utils import (NHKEasyNewsClient,
+                       NHKNewsClient,
+                       NHKNewsType,
+                       )
 
 class TestNHKEasyNewsClient:
     client = NHKEasyNewsClient()
@@ -35,5 +38,28 @@ class TestNHKEasyNewsClient:
 
         # 測試 get_content 方法
         response = self.client.get_content(news_id)
+        assert response.status_code == 200, f"Expected status code 200, got {response.status_code}"
+        assert news_id in response.text, f"Expected news_id {news_id} in response text"
+
+class TestNHKNewsClient:
+    client = NHKNewsClient()
+
+    def test_get_news_summary(self):
+        summary = self.client.get_news_summary(NHKNewsType.social, 1)
+
+        assert isinstance(summary, dict), "Expected data to be a dictionary"
+
+        # Check structure
+        assert "channel" in summary
+        assert "item" in summary["channel"]
+        assert len(summary["channel"]["item"]) > 0
+
+    def test_get_content(self):
+        # 拿取最新新聞的 id
+        summary = self.client.get_news_summary(NHKNewsType.social, 1)
+        _, date, news_id = summary["channel"]["item"][0]["link"].replace(".html", "").split("/")
+
+        # 測試 get_content 方法
+        response = self.client.get_content(date, news_id)
         assert response.status_code == 200, f"Expected status code 200, got {response.status_code}"
         assert news_id in response.text, f"Expected news_id {news_id} in response text"

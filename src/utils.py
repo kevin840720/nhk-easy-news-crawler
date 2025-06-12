@@ -11,39 +11,16 @@ from pathlib import Path
 from time import (sleep,
                   time,
                   )
-from typing import (Literal,
-                    List,
-                    Optional,
-                    )
-import json
-
-from Crypto.Cipher import AES
-import requests
-
-# -*- encoding: utf-8 -*-
-"""
-@File    :  main.py
-@Time    :  2024/05/02 15:51:37
-@Author  :  Kevin Wang
-@Desc    :  本程式主要用於下載和合併使用 HTTP Live Streaming (HLS) 協議的多媒體資料。HLS 將視頻內容 分割成數個較小的段落，每個段落都
-            通過 HTTP 協議以 TS (運輸流格式) 文件形式傳輸，利用 M3U8 播放列表來管理這些 TS 文件的索引。本類別的目的是從指定的 M3U8 播放
-            列表 URL 中抓取所有 TS 文件連結，下載這些文件，並最終合併成一個單一的多媒體文件。
-
-            爬蟲流程：
-            1. 解析 M3U8 播放列表以獲得 TS 文件的 URL。
-            2. 下載所有 TS 文件。
-            3. 將下載的 TS 文件合併成一個完整的視頻文件。
-"""
-
-from pathlib import Path
 from typing import (List,
                     Union,
                     )
 from urllib.parse import urljoin
-import re
+import json
 
-
+from Crypto.Cipher import AES
 import m3u8
+import requests
+
 
 class MyRequests:
     def __init__(self) -> None:
@@ -168,19 +145,33 @@ class MyRequests:
                 raise TimeoutError('No response, check your internet.')
         return response
 
-class HLSMediaCrawler:
+class HLSMediaDownloader:
     def __init__(self) -> None:
+        """本程式主要用於下載和合併使用 HTTP Live Streaming (HLS) 協議的多媒體資料。
+        
+        Note:
+            HLS 將視頻內容 分割成數個較小的段落，每個段落都通過 HTTP 協議以 TS (運輸流格式) 文件形式傳輸，利用 M3U8 播放列表來管理這些
+            TS 文件的索引。本類別的目的是從指定的 M3U8 播放列表 URL 中抓取所有 TS 文件連結，下載這些文件，並最終合併成一個單一的多媒體文件。
+        """
         self._requestor = MyRequests()
 
     def fetch_playlist(self,
                        m3u8_url:str,
                        ) -> List[m3u8.M3U8]:
-        """Fetch the playlist file from m3u8 and extract TS file URLs.
+        """Fetch and flatten all M3U8 playlists, including nested playlists, from the given M3U8 URL.
 
-        由於 M3U8 檔案中可能包含另一個 M3U8，所以要先將所有的 M3U8 攤平，只留下「包含 TS 檔的M3U8」
+        This function recursively resolves variant M3U8 playlists to extract and return a list
+        of all non-variant playlists that directly reference TS files.
+
+        Args:
+            m3u8_url (str): URL of the M3U8 playlist, for example https://example.com/master.m3u8
 
         Returns:
-            List[TS]: A list of TS objects representing the media segments found in the playlist.
+            List[m3u8.M3U8]: Playlists containing only TS segments
+
+        Notes:
+            - If the provided M3U8 is a variant playlist, it will recursively resolve all sub-playlists
+              until only non-variant playlists remain.
         """
 
         def get_m3u8s(obj:m3u8.M3U8):
@@ -194,7 +185,6 @@ class HLSMediaCrawler:
 
         playlist = m3u8.load(m3u8_url)
         playlists = get_m3u8s(playlist)
-        print(playlists[0].__dict__)
         return playlists
 
     def download_m3u8(self,
@@ -209,40 +199,80 @@ class HLSMediaCrawler:
         Returns:
             bytes: The combined binary content of all TS segments.
         """
-        # Retrieve AES key if encryption is used
+        combined_segments = b""
+
+        # If encrypted, get the key
         aes_key = None
+        iv_explicit = None
+
+        # According to HLS spec, all segments following the #EXT-X-KEY use the specified key and IV (if provided).
+        # If IV is not specified, we must derive it from the segment sequence number.
         if len(playlist.keys) > 0:
             key:m3u8.Key = playlist.keys[0]
             key_url = urljoin(key.base_uri, key.uri)
             key_response = self._requestor.request("GET", key_url)
             aes_key = key_response.content
-        
 
-        combined_segments = b""
-        for segment in playlist.segments:
-            # Download and process each TS segment
+            # If IV is explicitly given, parse it as a hex string.
+            if key.iv:
+                # IVs in M3U8 are specified as a hexadecimal string starting with 0x
+                iv_explicit = bytes.fromhex(key.iv[2:]) if key.iv.startswith("0x") else bytes.fromhex(key.iv)
+
+        # Determine the starting sequence number
+        # `#EXT-X-MEDIA-SEQUENCE` sets the sequence number of the first segment.
+        # If not present, default to 0.
+        sequence_number = playlist.media_sequence or 0
+        for idx, segment in enumerate(playlist.segments):
             ts_url = urljoin(segment.base_uri, segment.uri)
-            print(ts_url)
             response = self._requestor.request("GET", ts_url)
             segment_content = response.content
 
-            # Decrypt the segment if an AES key is provided
             if aes_key:
-                segment_content = self.decrypt_segment(segment_content, aes_key)
-                print("AAA")
+                # Derive IV if not explicitly set
+                if iv_explicit is not None:
+                    iv = iv_explicit
+                else:
+                    # Construct IV from sequence number
+                    # Big-endian 64-bit (or 128-bit) integer: per the HLS spec,
+                    # IV is a 128-bit number; we can represent sequence_number as a 64-bit integer and pad to 128 bits.
+                    # Common practice: pack the sequence number into the last 8 bytes of a 16-byte array.
+                    iv_int = sequence_number + idx
+                    iv = iv_int.to_bytes(16, byteorder='big')
+
+                segment_content = self.decrypt_segment(segment_content, aes_key, iv=iv)
 
             combined_segments += segment_content
         return combined_segments
 
-    def decrypt_segment(self, segment, key):
-        cipher = AES.new(key, AES.MODE_CBC, iv=b'\x00'*16)  # 初始化向量通常為零
+    def decrypt_segment(self, segment, key, mode=AES.MODE_CBC, iv=b'\x00'*16):
+        """Decrypt a single TS segment using AES CBC mode.
+
+        Args:
+            segment (bytes): Encrypted segment content
+            key (bytes): Decryption key
+            mode (_type_, optional): _description_. Defaults to AES.MODE_CBC.
+            iv (_type_, optional): _description_. Defaults to b'\x00'*16.
+
+        Returns:
+            bytes: Decrypted segment content
+        """
+        cipher = AES.new(key, mode=mode, iv=iv)
         return cipher.decrypt(segment)
 
     def save(self,
              m3u8_url:str,
              filename:Union[str,Path],
              ) -> None:
-        """Run the media crawler to fetch, download, and merge TS files.
+        """Download and save media from an M3U8 playlist.
+
+        Fetches playlist, downloads segments, and saves to file.
+
+        Args:
+            m3u8_url (str): URL of the M3U8 playlist
+            filename (Union[str, Path]): Output file path
+
+        Raises:
+            ValueError: If no playlists are found
         """
         playlists = self.fetch_playlist(m3u8_url)
         if len(playlists) == 0:
@@ -352,53 +382,14 @@ class NHKEasyNewsClient:
                                         )
         return response
 
-    def get_voice_m3u8_m4a_type(self,
-                                uri:str,
-                                ) -> requests.Response:
-        """
-        Retrieve the M4A voice recording for a news article.
-
-        Args:
-            uri (str): Unique identifier for the voice recording.
-
-        Returns:
-            requests.Response: A response containing the M4A voice recording's M3U8 playlist.
-        """
-        url = f"https://vod-stream.nhk.jp/news/easy_audio/{uri}/index.m3u8"
-        response = self.crawler.request(method="GET",
-                                        url=url,
-                                        )
-        return response
-
-    def get_voice_m3u8_mp4_type(self,
-                                uri:str,
-                                ) -> requests.Response:
-        """
-        Retrieve the MP4 voice recording for a news article.
-
-        Args:
-            uri (str): Unique identifier for the voice recording.
-
-        Returns:
-            requests.Response: A response containing the MP4 voice recording's M3U8 playlist.
-        """
-        url = f"https://vod-stream.nhk.jp/news/easy/{uri}/index.m3u8"
-        response = self.crawler.request(method="GET",
-                                        url=url,
-                                        )
-        return response
-
     def get_voice_m3u8(self,
                        uri:str,
-                       fmt:Literal["m4a", "mp4"]=None,
                        ) -> requests.Response:
         """
-        Retrieve a voice recording, attempting both M4A and MP4 formats.
+        Retrieve a voice recording.
 
         Args:
             uri (str): Unique identifier for the voice recording.
-            fmt (str, optional): Specific audio format to retrieve. 
-                                 Can be 'm4a', 'mp4', or None (tries both).
 
         Returns:
             requests.Response: A response containing the voice recording's M3U8 playlist.
@@ -406,20 +397,17 @@ class NHKEasyNewsClient:
         Raises:
             ValueError: If an invalid audio format is specified.
         """
-        if fmt not in [None, "m4a", "mp4"]:
-            raise ValueError("Unknown audio type")
-        formats = ["m4a", "mp4"] if fmt is None else [fmt]
+        candidate_urls = [f"https://vod-stream.nhk.jp/news/easy_audio/{uri}/index.m3u8",  # m4a type
+                          f"https://vod-stream.nhk.jp/news/easy/{uri}/index.m3u8",  # mp4 type
+                          ]
 
-        for format in formats:
-            if format == "mp4":
-                response = self.get_voice_m3u8_mp4_type(uri)
-            elif format == "m4a":
-                response = self.get_voice_m3u8_m4a_type(uri)
-
+        for url in candidate_urls:
+            response = self.crawler.request(method="GET",
+                                            url=url,
+                                            )
             if response.status_code == 200:
                 return response
         return response
-
 
 class NHKNewsType(Enum):
     social = 1
@@ -480,9 +468,8 @@ class NHKNewsClient:
         return self.crawler._last_response
 
     def get_news_summary(self,
-                      news_type:NHKNewsType,
-                      sheet:int=1,
-                      ) -> List[requests.Response]:
+                         news_type:NHKNewsType,
+                         ) -> dict:
         """
         Retrieve the list of news articles from the past year.
 
@@ -491,15 +478,28 @@ class NHKNewsClient:
         Returns:
             requests.Response: A response containing the news list in JSON format.
         """
-        url = f"https://www3.nhk.or.jp/news/json16/cat{news_type.value:02d}_{sheet:03d}.json"
+        data = {}
+        for sheet in range(1, 1000):
+            url = f"https://www3.nhk.or.jp/news/json16/cat{news_type.value:02d}_{sheet:03d}.json"
+            params = {"_": int(time()),  # Unix time (這像參數貌似不影響回傳結果)
+                      }
+            response = self.crawler.request(method="GET",
+                                            url=url,
+                                            params=params,
+                                            )
 
-        params = {"_": int(time()),  # Unix time (這像參數貌似不影響回傳結果)
-                    }
-        response = self.crawler.request(method="GET",
-                                        url=url,
-                                        params=params,
-                                        )
-        return response
+            current_data = json.loads(response.text)
+            if not data:
+                data = current_data
+            elif (("channel" in current_data)
+                  and ("item" in current_data["channel"])
+                  ):
+                data["channel"]["item"] += current_data["channel"]["item"]
+
+            # hasNext 會標注是否有「下一頁」
+            if current_data["channel"]["hasNext"] is False:
+                break
+        return data
 
     def get_content(self,
                     date:str,
@@ -521,9 +521,9 @@ class NHKNewsClient:
                                         )
         return response
 
-    def get_video_mp4(self,
-                      uri:str,
-                      ) -> requests.Response:
+    def get_video_m3u8(self,
+                       uri:str,
+                       ) -> requests.Response:
         """
         Retrieve the MP4 voice recording for a news article.
 
