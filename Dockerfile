@@ -8,10 +8,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 複製程式碼
 COPY src/ .
 
-# 定義並使用 PORT
+# 定義 PORT，預設用 5000 跑
 ARG PORT=5000
 ENV PORT=${PORT}
 
 EXPOSE ${PORT}
 
-CMD ["python", "app.py"]
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "${PORT}"]

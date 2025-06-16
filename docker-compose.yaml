@@ -43,7 +43,8 @@ services:
     ports:
       - "${SERVICE_PORT}:${SERVICE_PORT}"
     working_dir: /src
-    command: ["python", "app.py"]
+    # 下述 command 會覆蓋 Dockerfile 中的 CMD
+    command: ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "${SERVICE_PORT}"]
 
 volumes:
   db:

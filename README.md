@@ -15,7 +15,8 @@ NHK 簡易新聞爬蟲：<https://www3.nhk.or.jp/news/easy/>
 4. 啟動服務  
 
    ```bash
-   pipenv run python src/app.py
+   cd src
+   pipenv run uvicorn api:app --host 0.0.0.0 --port 41260 --reload
    ```
 
 5. 確認服務啟動：<http://localhost:${SERVICE_PORT}/status>（預設 port 為 41260）
@@ -50,42 +51,137 @@ NHK 簡易新聞爬蟲：<https://www3.nhk.or.jp/news/easy/>
 pipenv run python src/main.py
 ```
 
-### 2. 透過 Flask API 啟動服務
+### 2. 透過 FastAPI 啟動服務
 
-啟動 Flask 伺服器：
+啟動 FastAPI 伺服器：
 
 ```bash
-pipenv run python src/app.py
+cd src
+pipenv run uvicorn api:app --host 0.0.0.0 --port 41260 --reload
 ```
 
 伺服器啟動後，預設監聽於 `http://0.0.0.0:41260/`。
 
-#### API 說明
+## API 說明
 
-- **GET /status**  
-  服務存活檢查，回傳 `{"status": "ok"}`
+- 介面網址：[http://localhost:41260/docs](http://localhost:41260/docs)
+- Redoc 文件：[http://localhost:41260/redoc](http://localhost:41260/redoc)
 
-- **GET /crawler/easy**  
-  取得 NHK Easy News 資料，可選 query string `start_date`、`end_date`。
+### 1. `GET /status`
 
-- **GET /crawler/news**  
-  取得 NHK News 資料，可選 query string `start_date`、`end_date`。
+- 服務存活檢查  
+- 回傳範例：
 
-範例：
+    ```json
+    { "status": "ok" }
+    ```
+
+---
+
+### 2. `GET /crawler/easy`
+
+- 取得 NHK Easy News 資料  
+- 可選參數：`start_date`、`end_date`（`YYYY-MM-DD` 格式）
+
+**範例 (GET):**
 
 ```bash
 curl "http://localhost:41260/crawler/easy?start_date=2024-06-01&end_date=2024-06-15"
 ```
 
-回傳 JSON 範例：
+---
+
+### 3. `POST /crawler/easy`
+
+- 取得 NHK Easy News 資料  
+- Content-Type: `application/x-www-form-urlencoded`  
+- Body 參數：`start_date`、`end_date`
+
+**範例 (POST):**
+
+```bash
+curl -X POST "http://localhost:41260/crawler/easy" \
+  -d "start_date=2024-06-01" \
+  -d "end_date=2024-06-15"
+```
+
+---
+
+### 4. `GET /crawler/news`
+
+- 取得 NHK News 資料  
+- 可選參數：`start_date`、`end_date`
+
+**範例 (GET):**
+
+```bash
+curl "http://localhost:41260/crawler/news?start_date=2024-06-01&end_date=2024-06-15"
+```
+
+---
+
+### 5. `POST /crawler/news`
+
+- 取得 NHK News 資料  
+- Body 參數：`start_date`、`end_date`
+
+**範例 (POST):**
+
+```bash
+curl -X POST "http://localhost:41260/crawler/news" \
+  -d "start_date=2024-06-01" \
+  -d "end_date=2024-06-15"
+```
+
+---
+
+### 6. `GET /crawler/all`
+
+- 同時回傳 NHK Easy News 與 NHK News 資料  
+- 可選參數：`start_date`、`end_date`
+
+**範例 (GET):**
+
+```bash
+curl "http://localhost:41260/crawler/all?start_date=2024-06-01&end_date=2024-06-15"
+```
+
+---
+
+### 7. `POST /crawler/all`
+
+- 同時回傳 NHK Easy News 與 NHK News 資料  
+- Body 參數：`start_date`、`end_date`
+
+**範例 (POST):**
+
+```bash
+curl -X POST "http://localhost:41260/crawler/all" \
+  -d "start_date=2024-06-01" \
+  -d "end_date=2024-06-15"
+```
+
+---
+
+### 回傳 JSON 格式
 
 ```json
 {
   "status": "success",
   "count": 10,
-  "data": [...]
+  "data": [
+    {
+      // ...新聞物件
+    }
+  ]
 }
 ```
+
+---
+
+### Swagger 文件
+
+- 位置： [http://localhost:41260/docs](http://localhost:41260/docs)
 
 ## 重要參數文件說明
 
@@ -144,7 +240,7 @@ docker compose down -v
 ├── README.md                    # 專案說明文件
 ├── requirements.txt             # requirements 格式依賴清單
 ├── src
-│   ├── app.py                   # Flask API 主程式
+│   ├── api.py                   # FastAPI 主程式
 │   ├── config.py                # 設定參數相關
 │   ├── crawler.py               # 爬蟲實作
 │   ├── export.py                # 匯出資料工具

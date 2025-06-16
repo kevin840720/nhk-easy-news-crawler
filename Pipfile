@@ -12,7 +12,8 @@ pycryptodome = "*"
 psycopg-binary = "*"
 psycopg2-binary = "*"
 python-dotenv = "*"
-flask = "*"
+fastapi = "*"
+uvicorn = "*"
 
 [dev-packages]
 pytest = "*"
