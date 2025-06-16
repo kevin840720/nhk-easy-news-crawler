@@ -1,26 +1,35 @@
-# -*- encoding: utf-8 -*-
-"""
-@File    :  app.py
-@Time    :  2025/06/16 06:49:57
-@Author  :  Kevin Wang
-@Desc    :  None
-"""
+# app.py
+from flask import Flask, request, jsonify
+from main import run_nhk_easy_crawler, run_nhk_crawler
 
-from flask import Flask, jsonify, request
-from main import run_crawler
+def get_dates():
+    # GET/POST 一樣從 values 取
+    return request.values.get("start_date"), request.values.get("end_date")
 
 app = Flask(__name__)
+app.json.ensure_ascii = False   # 關掉 unicode escape
 
-@app.route("/")
-def index():
-    return "NHK Easy News Crawler is running."
+@app.route("/crawler/easy", methods=["GET","POST"])
+def crawler_easy():
+    start_date, end_date = get_dates()
+    data = run_nhk_crawler(start_date=start_date,
+                           end_date=end_date,
+                           )
+    return jsonify(status="success",
+                   count=len(data),
+                   data=data,
+                   )
 
-@app.route("/run-crawler", methods=["POST"])
-def run_crawler_api():
-    start_date = request.args.get("start_date")
-    end_date = request.args.get("end_date")
-    count = run_crawler(start_date=start_date, end_date=end_date)
-    return jsonify({"status": "success", "inserted_news_count": count})
+@app.route("/crawler/news", methods=["GET","POST"])
+def crawler_news():
+    start_date, end_date = get_dates()
+    data = run_nhk_crawler(start_date=start_date,
+                           end_date=end_date,
+                           )
+    return jsonify(status="success",
+                   count=len(data),
+                   data=data,
+                   )
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=41260)
+    app.run(host="0.0.0.0", port=41260, debug=True)

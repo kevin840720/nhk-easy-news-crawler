@@ -1,30 +1,59 @@
 # nhk_easy_news_crawler
 
-Crawler for NHK Easy News: https://www3.nhk.or.jp/news/easy/
-
-## TODO
-1. Create pipenv enviroment:
-    ```sh
-    pipenv install -d
-    ```
-2. Git initialize:
-    ```sh
-    git init --initial-branch=main
-    git add .
-    git commit -m "[init]: project init"
-    ```
-3. Create gitlab project and push current code to remote
-    ```sh
-    git remote add origin {git-path}
-    git push -u origin main
-    ```
-
+Crawler for NHK Easy News: <https://www3.nhk.or.jp/news/easy/>
 
 ## Installation Method
+
 tbd;
 
 ## How to use
-tbd;
+
+### 1. 直接執行爬蟲
+
+使用 pipenv 執行主程式，將自動爬取 NHK Easy News 並匯入資料庫：
+
+```sh
+pipenv run python src/main.py
+```
+
+可選擇性指定日期範圍（格式：YYYY-MM-DD）：
+
+```sh
+pipenv run python src/main.py --start_date 2024-06-01 --end_date 2024-06-15
+```
+
+### 2. 透過 Flask API 啟動服務
+
+啟動 Flask 伺服器：
+
+```sh
+pipenv run python src/app.py
+```
+
+伺服器啟動後，預設監聽於 `http://0.0.0.0:41260/`。
+
+#### API 說明
+
+- **GET /**  
+  回傳服務狀態字串。
+
+- **POST /run-crawler**  
+  觸發爬蟲執行，可透過 query string 傳入 `start_date`、`end_date` 參數：
+
+  範例：
+
+  ```sh
+  curl -X POST "http://localhost:41260/run-crawler?start_date=2024-06-01&end_date=2024-06-15"
+  ```
+
+  回傳 JSON：
+
+  ```json
+  {
+    "status": "success",
+    "inserted_news_count": 10
+  }
+  ```
 
 ## Project Organization
 
@@ -72,7 +101,6 @@ tbd;
     │       └── visualize.py
     │
     └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io
-
 
 --------
 
