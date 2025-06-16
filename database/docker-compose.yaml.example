@@ -1,3 +1,6 @@
+# 開發用 docker-compose.yaml
+# 目的用於建立臨時性的 PostgreSQL
+
 version: '3'
 services:
   japanese-article-postgresql:
@@ -14,7 +17,7 @@ services:
       - {{Project absolute path}}/database/data:/var/lib/postgresql/data
     ports:
       - "${PG_PORT}:5432"
-    user: 1000:1000
+    # user: 1000:1000
 
 volumes:
   db:

@@ -9,12 +9,16 @@ def get_dates():
 app = Flask(__name__)
 app.json.ensure_ascii = False   # 關掉 unicode escape
 
+@app.route("/status", methods=["GET"])
+def status_check():
+    return jsonify(status="ok"), 200
+
 @app.route("/crawler/easy", methods=["GET","POST"])
 def crawler_easy():
     start_date, end_date = get_dates()
-    data = run_nhk_crawler(start_date=start_date,
-                           end_date=end_date,
-                           )
+    data = run_nhk_easy_crawler(start_date=start_date,
+                                end_date=end_date,
+                                )
     return jsonify(status="success",
                    count=len(data),
                    data=data,
@@ -32,4 +36,8 @@ def crawler_news():
                    )
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=41260, debug=True)
+    import os
+    app.run(host="0.0.0.0",
+            port=int(os.getenv("SERVICE_PORT")),
+            debug=True,
+            )
