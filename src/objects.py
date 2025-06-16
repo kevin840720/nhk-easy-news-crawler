@@ -51,9 +51,7 @@ class HTMLContent:
     html:Optional[str]=None
 
     def to_json_dict(self):
-        data = {}
-        data['id'] = self.id
-        data = {**data, **asdict(self)}
+        data = asdict(self)
 
         if data['publication_time'] is not None:
             data['publication_time'] = data['publication_time'].isoformat()
@@ -61,8 +59,9 @@ class HTMLContent:
             data['download_time'] = data['download_time'].isoformat()
         if data['filepath'] is not None:
             data['filepath'] = self.filepath.__str__()
-        data.pop("html")  # 不要儲存原始 html
 
+        # 不要儲存原始 html
+        data.pop("html")
         return data
 
 @dataclass

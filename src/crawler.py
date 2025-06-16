@@ -7,6 +7,7 @@
 """
 
 from datetime import datetime, timedelta
+from typing import List
 import json
 
 from bs4 import BeautifulSoup
@@ -115,7 +116,7 @@ class NHKEasyWebCrawler:
                              start_date:datetime=None,
                              end_date:datetime=None,
                              save_dir=ProjectConfigs.RAW_DIR.joinpath("nhk_easy_web"),
-                             ):
+                             ) -> List[News]:
         """Retrieve recent news articles within a specified date range.
 
         This method fetches news articles from NHK Easy Web, downloading both 
@@ -288,7 +289,7 @@ class NHKWebCrawler:
                              start_date:datetime=None,
                              end_date:datetime=None,
                              save_dir=ProjectConfigs.RAW_DIR.joinpath("nhk_news"),
-                             ):
+                             ) -> List[News]:
         """Retrieve recent news articles within a specified date range.
 
         This method fetches news articles from NHK News, downloading both content and video (if exists) for each article.
