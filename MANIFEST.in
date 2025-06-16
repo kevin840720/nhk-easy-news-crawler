@@ -1,2 +1,0 @@
-recursive-include nhk_easy_news_crawler/config *
-recursive-include nhk_easy_news_crawler/data *

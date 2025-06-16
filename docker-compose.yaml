@@ -1,0 +1,50 @@
+# 部署用 docker-compose.yaml
+
+# 通訊關係總覽：
+# 來源           → 目標           ｜ 通訊方式                            ｜ 說明
+#      主機      → PostgreSQL    ｜ ${PG_PORT} → 5432                  ｜ 開發時從主機連資料庫（如 pgAdmin）
+#      主機      → NHK 爬蟲服務    ｜ ${SERVICE_PORT} → ${SERVICE_PORT} ｜ 對外提供 HTTP API 或介面
+#  NHK 爬蟲服務   → PostgreSQL    ｜ japanese_article_postgresql:5432   ｜ container 內部直連資料庫，不經過主機
+
+version: '3.8'
+
+services:
+  japanese_article_postgresql:
+    image: pgvector/pgvector:pg17
+    container_name: ${CONTAINER_NAME}
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${PG_DBNAME}
+      POSTGRES_USER: ${PG_USERNAME}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    volumes:
+      - ./database/data:/var/lib/postgresql/data
+    ports:
+      - "${PG_PORT}:5432"
+
+  nhk-crawler-service:
+    build:
+      context: .
+    container_name: nhk-crawler-service
+    restart: unless-stopped
+    depends_on:
+      - japanese_article_postgresql
+    env_file:
+      - .env
+    environment:
+      PG_HOST: japanese_article_postgresql
+      PG_PORT: 5432
+      PG_DBNAME: ${PG_DBNAME}
+      PG_USERNAME: ${PG_USERNAME}
+      PG_PASSWORD: ${PG_PASSWORD}
+      PORT: ${SERVICE_PORT}
+    ports:
+      - "${SERVICE_PORT}:${SERVICE_PORT}"
+    working_dir: /src
+    command: ["python", "app.py"]
+
+volumes:
+  db:
+    driver: local
