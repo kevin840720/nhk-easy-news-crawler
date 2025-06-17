@@ -9,7 +9,7 @@
 version: '3.8'
 
 services:
-  japanese_article_postgresql:
+  japanese-article-postgresql:
     image: pgvector/pgvector:pg17
     container_name: ${CONTAINER_NAME}
     restart: always
@@ -20,7 +20,8 @@ services:
       POSTGRES_USER: ${PG_USERNAME}
       POSTGRES_PASSWORD: ${PG_PASSWORD}
     volumes:
-      - ./database/data:/var/lib/postgresql/data
+      - ${PG_VOLUME}:/var/lib/postgresql/data
+    user: "999:999"  # 通常 postgres user 的 UID/GID
     ports:
       - "${PG_PORT}:5432"
 
@@ -30,7 +31,7 @@ services:
     container_name: nhk-crawler-service
     restart: unless-stopped
     depends_on:
-      - japanese_article_postgresql
+      - japanese-article-postgresql
     env_file:
       - .env
     environment:

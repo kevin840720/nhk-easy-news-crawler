@@ -16,7 +16,7 @@ NHK 簡易新聞爬蟲：<https://www3.nhk.or.jp/news/easy/>
 
    ```bash
    cd src
-   pipenv run uvicorn api:app --host 0.0.0.0 --port 41260 --reload
+   pipenv run uvicorn api:app --host 0.0.0.0 --port 41261 --reload
    ```
 
 5. 確認服務啟動：<http://localhost:${SERVICE_PORT}/status>（預設 port 為 41260）
@@ -35,10 +35,10 @@ NHK 簡易新聞爬蟲：<https://www3.nhk.or.jp/news/easy/>
    docker compose build --no-cache
    ```
 
-3. 啟動容器  
+3. 啟動容器，當看到「✅ PostgreSQL 與服務已啟動，資料目錄已設定權限」即是成功啟動
 
    ```bash
-   docker compose up -d
+   bash init.sh
    ```
 
 ## 使用方式
@@ -60,7 +60,8 @@ cd src
 pipenv run uvicorn api:app --host 0.0.0.0 --port 41260 --reload
 ```
 
-伺服器啟動後，預設監聽於 `http://0.0.0.0:41260/`。
+伺服器啟動後，預設監聽於 `http://0.0.0.0:41260/`。</br>
+可以從 `http://0.0.0.0:41260/status`檢視伺服器是否成功啟動
 
 ## API 說明
 
